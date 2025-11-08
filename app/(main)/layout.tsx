@@ -1,6 +1,13 @@
 // app/(main)/layout.tsx
 import { Header } from "@/components/header";
+import { Poppins } from 'next/font/google';
 
+const poppins = Poppins({
+  subsets: ['latin'],
+  display: 'swap',
+  variable: '--font-poppins',
+  weight: ['100', '200', '300', '400', '500', '600', '700', '800', '900']
+});
 
 export default function MainAppLayout({
   children,
@@ -8,7 +15,7 @@ export default function MainAppLayout({
   children: React.ReactNode;
 }) {
   return (
-    <>
+    <div className={poppins.variable}>
       <Header />
       <main>{children}</main>
       <footer className="border-t border-gray-200 bg-white py-12">
@@ -18,6 +25,6 @@ export default function MainAppLayout({
             </p>
           </div>
         </footer>
-    </>
+    </div>
   );
 }

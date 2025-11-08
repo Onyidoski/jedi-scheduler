@@ -18,7 +18,7 @@ export function Header() {
   ];
 
   return (
-    <header className="fixed top-0 z-50 w-full border-b border-gray-200 bg-white/80 backdrop-blur-md">
+    <header className="fixed top-0 z-50 w-full border-b border-gray-200 bg-white/80 backdrop-blur-md ">
       <nav className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
         <div className="flex items-center gap-2 text-2xl font-bold">
           <Link href="/" className="text-[#994899]">
