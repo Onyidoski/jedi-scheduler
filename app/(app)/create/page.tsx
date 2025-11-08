@@ -1,7 +1,8 @@
 "use client";
 
 import { createClient } from "@/lib/supabase/client";
-import { Calendar, Send, Video, CloudUpload, Loader2 } from "lucide-react"; // <--- Added Loader2
+import { useCompletion } from "ai/react"; // <--- Vercel AI Hook
+import { Calendar, CloudUpload, Loader2, Send, Sparkles, Video } from "lucide-react"; // <--- Added Sparkles
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -15,12 +16,37 @@ export default function CreatePostPage() {
   const router = useRouter();
   const supabase = createClient();
 
+  // --- NEW: AI Hook ---
+  const { complete, completion, isLoading: isAILoading } = useCompletion({
+    api: "/api/generate",
+    onFinish: (result) => {
+        setCaption(result); // Update our main caption state when done
+    }
+  });
+
+  const handleGenerateCaption = async () => {
+    if (!file) {
+        alert("Please upload a video first so the AI knows what to write about!");
+        return;
+    }
+    // We send a prompt to the AI based on the filename for now
+    // (Later we could add a small text input for "what is this video about?")
+    complete(`Write a caption for a video titled: "${file.name}". Make it exciting and engaging.`);
+  };
+
+  // Sync AI completion with caption box while it streams
+  // (This makes the text appear character-by-character amazingly fast)
+  if (completion && completion !== caption && isAILoading) {
+      setCaption(completion);
+  }
+
   const handlePlatformToggle = (platform: string) => {
     if (platforms.includes(platform)) setPlatforms(platforms.filter((p) => p !== platform));
     else setPlatforms([...platforms, platform]);
   };
 
   const submitPost = async (status: 'published' | 'scheduled', dateToSave: string | null) => {
+    // ... (This function stays exactly the same as before) ...
     if (!file) return;
     setLoading(true);
 
@@ -30,18 +56,12 @@ export default function CreatePostPage() {
 
       const fileExt = file.name.split('.').pop();
       const fileName = `${user.id}/${Date.now()}.${fileExt}`;
-      
-      // 1. Upload Video
       const { data: fileData, error: uploadError } = await supabase.storage
         .from('Videos')
-        .upload(fileName, file, {
-          cacheControl: '3600',
-          upsert: false
-        });
+        .upload(fileName, file, { cacheControl: '3600', upsert: false });
 
       if (uploadError) throw uploadError;
 
-      // 2. Save Post Data
       const { error: dbError } = await supabase.from('Posts').insert({
           user_id: user.id,
           caption: caption,
@@ -59,7 +79,7 @@ export default function CreatePostPage() {
     } catch (error: any) {
       console.error("Error:", error);
       alert("Error: " + error.message);
-      setLoading(false); // Only stop loading on error (otherwise we redirect)
+      setLoading(false);
     }
   };
 
@@ -68,9 +88,7 @@ export default function CreatePostPage() {
       <h1 className="text-3xl font-bold mb-8 text-white">Create New Post</h1>
 
       <form className="space-y-8 bg-[#1A1D21] p-8 rounded-2xl border border-white/5 shadow-2xl relative">
-
-        {/* --- LOADING OVERLAY --- */}
-        {/* This only shows when 'loading' is true */}
+        {/* Loading Overlay (Same as before) */}
         {loading && (
           <div className="absolute inset-0 bg-[#1A1D21]/80 backdrop-blur-sm z-50 rounded-2xl flex flex-col items-center justify-center">
             <Loader2 className="w-12 h-12 text-[#8B5CF6] animate-spin mb-4" />
@@ -79,7 +97,7 @@ export default function CreatePostPage() {
           </div>
         )}
 
-        {/* 1. Video Upload Area */}
+        {/* 1. Video Upload */}
         <div>
           <label className="block text-sm font-medium mb-3 text-slate-300">Video File</label>
           <div className={`border-2 border-dashed rounded-xl p-10 text-center transition-all relative group ${file ? 'border-[#8B5CF6] bg-[#8B5CF6]/5' : 'border-white/10 hover:border-white/20 hover:bg-white/5'}`}>
@@ -108,45 +126,58 @@ export default function CreatePostPage() {
           </div>
         </div>
 
-        {/* 2. Caption Input */}
-        <div>
-          <label className="block text-sm font-medium mb-3 text-slate-300">Caption</label>
+        {/* 2. Caption Input with AI Button */}
+        <div className="relative">
+          <div className="flex justify-between items-center mb-3">
+              <label className="block text-sm font-medium text-slate-300">Caption</label>
+              {/* NEW: AI Generate Button */}
+              <button
+                type="button"
+                onClick={handleGenerateCaption}
+                disabled={isAILoading || loading || !file}
+                className="text-xs font-bold text-[#8B5CF6] hover:text-[#A78BFA] flex items-center gap-1.5 bg-[#8B5CF6]/10 px-3 py-1.5 rounded-full transition-all hover:bg-[#8B5CF6]/20 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isAILoading ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                    <Sparkles className="w-3.5 h-3.5" />
+                )}
+                {isAILoading ? "Writing..." : "Generate with AI"}
+              </button>
+          </div>
           <textarea
             rows={5}
             value={caption}
             onChange={(e) => setCaption(e.target.value)}
-            disabled={loading}
+            disabled={loading || isAILoading}
             className="w-full p-4 rounded-xl border border-white/10 bg-[#141619] text-white placeholder:text-slate-600 focus:border-[#8B5CF6] focus:ring-1 focus:ring-[#8B5CF6] outline-none transition-all resize-none disabled:opacity-50"
             placeholder="Write something engaging..."
           />
         </div>
 
-        {/* 3. Platform Selection */}
+        {/* 3. Platforms & 4. Scheduling (Same as before, just need to be here for full file) */}
+        {/* ... (Copy the rest of the form from previous version if needed, or use full file below) ... */}
         <div>
           <label className="block text-sm font-medium mb-3 text-slate-300">Select Platforms</label>
           <div className="flex flex-wrap gap-3">
-            {["TikTok", "Instagram", "YouTube", "Facebook"].map((platform) => {
-              const isSelected = platforms.includes(platform);
-              return (
-                <button
-                  key={platform}
-                  type="button"
-                  disabled={loading}
-                  onClick={() => handlePlatformToggle(platform)}
-                  className={`flex items-center gap-2 px-5 py-2.5 rounded-full font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
-                    isSelected
-                      ? 'bg-[#8B5CF6] text-white shadow-lg shadow-[#8B5CF6]/20'
-                      : 'bg-[#141619] text-slate-400 border border-white/5 hover:bg-white/5 hover:text-white'
-                  }`}
-                >
-                  {platform}
-                </button>
-              );
-            })}
+            {["TikTok", "Instagram", "YouTube", "Facebook"].map((platform) => (
+              <button
+                key={platform}
+                type="button"
+                disabled={loading}
+                onClick={() => handlePlatformToggle(platform)}
+                className={`flex items-center gap-2 px-5 py-2.5 rounded-full font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
+                  platforms.includes(platform)
+                    ? 'bg-[#8B5CF6] text-white shadow-lg shadow-[#8B5CF6]/20'
+                    : 'bg-[#141619] text-slate-400 border border-white/5 hover:bg-white/5 hover:text-white'
+                }`}
+              >
+                {platform}
+              </button>
+            ))}
           </div>
         </div>
 
-        {/* 4. Scheduling */}
         <div className="pt-6 border-t border-white/5">
           <label className="block text-sm font-medium mb-3 text-slate-300 flex items-center gap-2">
              <Calendar className="w-4 h-4 text-slate-500" />
@@ -161,7 +192,6 @@ export default function CreatePostPage() {
           />
         </div>
 
-        {/* Action Buttons */}
         <div className="flex gap-4 pt-6">
            <button
             type="button"

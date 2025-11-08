@@ -5,7 +5,7 @@ import { useRef, useState } from "react";
 
 interface VideoCardProps {
   post: any;
-  minimal?: boolean; // <--- New optional prop
+  minimal?: boolean;
 }
 
 export function VideoCard({ post, minimal = false }: VideoCardProps) {
@@ -69,15 +69,18 @@ export function VideoCard({ post, minimal = false }: VideoCardProps) {
           </button>
         )}
         
-        {/* Status Badge - HIDE IN MINIMAL MODE TOO if you want, or keep it. I'll keep it for now. */}
+        {/* Status Badge */}
         <div className="absolute top-3 right-3 pointer-events-none">
-          <span className="bg-[#FACC15] text-black text-[10px] font-extrabold px-2 py-1 rounded-sm uppercase">
-            {post.status === 'scheduled' ? 'ENABLED' : post.status}
+          <span className={`text-[10px] font-extrabold px-2 py-1 rounded-sm uppercase ${
+            post.status === 'scheduled' ? 'bg-[#FACC15] text-black' : 'bg-emerald-500 text-black'
+          }`}>
+            {/* FIX IS HERE VVV */}
+            {post.status === 'scheduled' ? 'SCHEDULED' : post.status}
           </span>
         </div>
       </div>
 
-      {/* Content Area - ONLY SHOW IF NOT MINIMAL */}
+      {/* Content Area */}
       {!minimal && (
         <div className="p-5">
           <h3 className="text-white font-medium line-clamp-1 mb-4">

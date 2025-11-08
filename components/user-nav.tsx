@@ -28,14 +28,19 @@ export function UserNav() {
   return (
     <DropdownMenu.Root>
       <DropdownMenu.Trigger asChild>
-        <button className="group flex items-center gap-3 w-full p-2 rounded-lg hover:bg-white/5 transition-colors outline-none">
+        <button
+          // This tells React to ignore ID mismatches from browser extensions
+          suppressHydrationWarning
+          // Removed 'w-full' so it fits nicely in the Top Nav
+          className="group flex items-center gap-3 p-2 rounded-lg hover:bg-white/5 transition-colors outline-none"
+        >
           {/* Avatar Circle - Violet to pop against dark bg */}
           <div className="w-8 h-8 rounded-full bg-[#8B5CF6] flex items-center justify-center shrink-0">
              <User className="w-4 h-4 text-white" />
           </div>
           
-          {/* Email Text */}
-          <div className="flex-1 text-left hidden lg:block overflow-hidden">
+          {/* Email Text - Hidden on small screens, visible on large */}
+          <div className="text-left hidden lg:block max-w-[150px]">
             <p className="text-xs text-slate-400 font-medium truncate">
                {userEmail || "Loading..."}
             </p>
@@ -48,9 +53,9 @@ export function UserNav() {
 
       <DropdownMenu.Portal>
         <DropdownMenu.Content
-          className="w-64 bg-[#1A1D21] rounded-xl shadow-2xl border border-white/10 p-2 z-50 animate-in fade-in-80 zoom-in-95 text-slate-200 ml-4"
+          className="w-64 bg-[#1A1D21] rounded-xl shadow-2xl border border-white/10 p-2 z-50 animate-in fade-in-80 zoom-in-95 text-slate-200 mr-4 mt-2"
           sideOffset={5}
-          align="start"
+          align="end"
         >
           {/* Header */}
           <div className="px-3 py-2.5 text-sm border-b border-white/5 mb-2">
