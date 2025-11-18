@@ -8,83 +8,63 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const code = url.searchParams.get('code');
   const state = url.searchParams.get('state');
+  const error = url.searchParams.get('error');
 
-  // --- THIS IS THE FIX ---
-  // We must 'await' the cookies() function
-  const cookieStore = await cookies();
-  // --- END FIX ---
-  
-  const savedState = cookieStore.get('tiktok_oauth_state')?.value;
-
-  // 1. Security Check: Verify the 'state' param
-  if (!state || !savedState || state !== savedState) {
-    // --- FIX: We must delete the cookie even if we fail ---
-    const response = NextResponse.json({ error: 'Invalid state parameter.' }, { status: 400 });
-    response.cookies.set('tiktok_oauth_state', '', { maxAge: -1 }); // Delete cookie
-    return response;
-    // --- END FIX ---
+  if (error) {
+    return NextResponse.redirect(new URL(`/settings?error=${error}`, request.url));
   }
-  
-  // --- FIX: We remove the .delete() line from here ---
-  // cookieStore.delete('tiktok_oauth_state'); // This was incorrect
 
   if (!code) {
-    return NextResponse.json({ error: 'No code provided' }, { status: 400 });
+    return NextResponse.redirect(new URL('/settings?error=No+code+provided', request.url));
   }
 
-  // --- THIS IS THE FIX ---
-  // We read the keys from process.env WITHOUT NEXT_PUBLIC_
-  const TIKTOK_CLIENT_KEY = process.env.TIKTOK_CLIENT_KEY;
-  const TIKTOK_CLIENT_SECRET = process.env.TIKTOK_CLIENT_SECRET;
-  const TIKTOK_REDIRECT_URI = process.env.TIKTOK_REDIRECT_URI;
-  // --- END FIX ---
+  // 1. Verify State (CSRF Protection)
+  const cookieStore = await cookies();
+  const storedState = cookieStore.get('tiktok_oauth_state')?.value;
+
+  if (!state || !storedState || state !== storedState) {
+    return NextResponse.redirect(new URL('/settings?error=Invalid+state', request.url));
+  }
 
   try {
-    // 2. Exchange the code for an access token
+    // 2. Exchange Code for Access Token
+    const clientKey = process.env.TIKTOK_CLIENT_KEY!;
+    const clientSecret = process.env.TIKTOK_CLIENT_SECRET!;
+    const redirectUri = process.env.TIKTOK_REDIRECT_URI!;
+
     const tokenParams = new URLSearchParams();
-    tokenParams.append('client_key', TIKTOK_CLIENT_KEY!);
-    tokenParams.append('client_secret', TIKTOK_CLIENT_SECRET!);
+    tokenParams.append('client_key', clientKey);
+    tokenParams.append('client_secret', clientSecret);
     tokenParams.append('code', code);
     tokenParams.append('grant_type', 'authorization_code');
-    tokenParams.append('redirect_uri', TIKTOK_REDIRECT_URI!);
+    tokenParams.append('redirect_uri', redirectUri);
 
-    const tokenResponse = await fetch('https://open.tiktokapis.com/v2/oauth/token/', {
+    const tokenRes = await fetch('https://open.tiktokapis.com/v2/oauth/token/', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: tokenParams,
     });
 
-    const tokenData = await tokenResponse.json();
+    const tokenData = await tokenRes.json();
 
     if (tokenData.error) {
-      throw new Error(`TikTok Token Error: ${tokenData.error_description}`);
+      throw new Error(tokenData.error_description || 'Failed to exchange token');
     }
 
-    const {
-      access_token,
-      refresh_token,
-      expires_in,
-      scope,
-      open_id, // This is the user's TikTok ID
-    } = tokenData.data;
-
-    // 3. Get the Supabase user
+    // 3. Get the User from Supabase
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      throw new Error("User not authenticated.");
-    }
+
+    if (!user) throw new Error("User not authenticated");
+
+    // 4. Save to Database
+    const { access_token, refresh_token, open_id, expires_in } = tokenData.data;
     
-    // 4. (Optional but recommended) Get the user's TikTok username
-    const userResponse = await fetch('https://open.tiktokapis.com/v2/user/info/?fields=open_id,display_name,avatar_large_url', {
-      headers: { 'Authorization': `Bearer ${access_token}` }
-    });
-    const userData = await userResponse.json();
-    const tiktokUsername = userData.data.user?.display_name || 'Unknown';
-
-
-    // 5. Save the tokens securely in our new database table
+    // Calculate expiry date
     const expiresAt = new Date(Date.now() + expires_in * 1000);
+
+    // Optional: Fetch username to display in settings
+    // (We skip this for now to keep it simple, we can add it later)
 
     const { error: dbError } = await supabase
       .from('social_connections')
@@ -92,42 +72,27 @@ export async function GET(request: Request) {
         user_id: user.id,
         platform: 'tiktok',
         platform_user_id: open_id,
-        platform_username: tiktokUsername,
-        access_token: access_token, // TODO: Encrypt this!
-        refresh_token: refresh_token, // TODO: Encrypt this!
+        access_token: access_token,
+        refresh_token: refresh_token,
         expires_at: expiresAt.toISOString(),
-        scopes: scope.split(','),
+        scopes: ['video.upload', 'video.publish'],
+        platform_username: 'Connected User' // Placeholder for now
       }, {
-        onConflict: 'user_id, platform' // Update if it already exists
+        onConflict: 'user_id, platform'
       });
 
     if (dbError) throw dbError;
 
-    // 6. Redirect the user back to the settings page
-    // --- FIX: We create the response first, then delete the cookie ---
+    // 5. Success! Redirect back to settings
     const response = NextResponse.redirect(new URL('/settings', request.url));
-    response.cookies.set('tiktok_oauth_state', '', {
-      path: '/',
-      httpOnly: true,
-      maxAge: -1 // Setting maxAge to -1 or 0 tells the browser to delete it
-    });
-    return response;
-    // --- END FIX ---
-
-  } catch (error: any) {
-    console.error('TikTok Callback Error:', error);
-    // Redirect back to settings with an error message
-    const errorUrl = new URL('/settings', request.url);
-    errorUrl.searchParams.append('error', error.message);
     
-    // --- FIX: Also delete the cookie on error ---
-    const response = NextResponse.redirect(errorUrl);
-    response.cookies.set('tiktok_oauth_state', '', {
-      path: '/',
-      httpOnly: true,
-      maxAge: -1
-    });
+    // Clean up the state cookie
+    response.cookies.set('tiktok_oauth_state', '', { maxAge: 0 });
+    
     return response;
-    // --- END FIX ---
+
+  } catch (err: any) {
+    console.error("TikTok Auth Error:", err);
+    return NextResponse.redirect(new URL(`/settings?error=${encodeURIComponent(err.message)}`, request.url));
   }
 }
