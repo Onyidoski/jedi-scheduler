@@ -3,11 +3,16 @@
 import { createClient } from "@/lib/supabase/client";
 // 1. Import 'Wand2' for our new section
 import { Loader2, Mail, Lock, Wand2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react"; // Import Suspense
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link"; // 2. Import Link
 
-export default function SettingsPage() {
+// --- THIS IS THE FIX ---
+// This tells Vercel not to prerender this page, which solves the build error
+export const dynamic = 'force-dynamic';
+// --- END FIX ---
+
+function SettingsContent() {
   const supabase = createClient();
   const router = useRouter();
   const searchParams = useSearchParams(); // To read errors from the URL
@@ -177,12 +182,21 @@ export default function SettingsPage() {
             disabled={resetting}
             className="flex items-center justify-center gap-2 bg-white/5 hover:bg-white/10 text-white font-medium py-3 px-6 rounded-xl transition-all border border-white/10 disabled:opacity-50"
           >
-            {resetting ? <Loader2 className="w-5 h-5 animate-spin" /> : <Lock className="w-5 h-5" />}
+            {resetting ? <Loader2 className="w-5 h-s animate-spin" /> : <Lock className="w-5 h-5" />}
             {resetting ? "Sending..." : "Send Password Reset Email"}
           </button>
         </div>
 
       </div>
     </div>
+  );
+}
+
+// Wrap the component in Suspense
+export default function SettingsPage() {
+  return (
+    <Suspense fallback={<div className="flex h-[50vh] items-center justify-center text-slate-400"><Loader2 className="w-8 h-8 animate-spin" /></div>}>
+      <SettingsContent />
+    </Suspense>
   );
 }

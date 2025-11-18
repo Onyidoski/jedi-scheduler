@@ -32,9 +32,12 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'No code provided' }, { status: 400 });
   }
 
-  const TIKTOK_CLIENT_KEY = process.env.NEXT_PUBLIC_TIKTOK_CLIENT_KEY;
-  const TIKTOK_CLIENT_SECRET = process.env.NEXT_PUBLIC_TIKTOK_CLIENT_SECRET;
-  const TIKTOK_REDIRECT_URI = process.env.NEXT_PUBLIC_TIKTOK_REDIRECT_URI;
+  // --- THIS IS THE FIX ---
+  // We read the keys from process.env WITHOUT NEXT_PUBLIC_
+  const TIKTOK_CLIENT_KEY = process.env.TIKTOK_CLIENT_KEY;
+  const TIKTOK_CLIENT_SECRET = process.env.TIKTOK_CLIENT_SECRET;
+  const TIKTOK_REDIRECT_URI = process.env.TIKTOK_REDIRECT_URI;
+  // --- END FIX ---
 
   try {
     // 2. Exchange the code for an access token

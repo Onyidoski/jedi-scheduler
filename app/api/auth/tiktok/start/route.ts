@@ -5,8 +5,11 @@ import { cookies } from 'next/headers';
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
-  const TIKTOK_CLIENT_KEY = process.env.NEXT_PUBLIC_TIKTOK_CLIENT_KEY;
-  const TIKTOK_REDIRECT_URI = process.env.NEXT_PUBLIC_TIKTOK_REDIRECT_URI;
+  // --- THIS IS THE FIX ---
+  // We read the keys from process.env WITHOUT NEXT_PUBLIC_
+  const TIKTOK_CLIENT_KEY = process.env.TIKTOK_CLIENT_KEY;
+  const TIKTOK_REDIRECT_URI = process.env.TIKTOK_REDIRECT_URI;
+  // --- END FIX ---
 
   if (!TIKTOK_CLIENT_KEY || !TIKTOK_REDIRECT_URI) {
     throw new Error('TikTok environment variables are not set.');
