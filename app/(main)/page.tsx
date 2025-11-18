@@ -3,6 +3,9 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { useState } from 'react';
+// 1. IMPORT THE IMAGE DIRECTLY
+// This ensures Next.js bundles the image correctly, regardless of path issues
+import heroImage from './hero6.png'; // If image is in the same folder as page.tsx
 
 export default function Home() {
   const [hoveredCard, setHoveredCard] = useState<number | null>(null);
@@ -33,45 +36,46 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-white font-poppins overflow-x-hidden">
-{/* -------------------- Hero Section -------------------- */}
-<div className="flex items-center bg-gradient-to-r from-[#CBB2FE] via-[#E5C8FF] via-[#F7DFFF] to-[#FFF0E6]">
-  <div className="container mx-auto flex flex-col lg:flex-row px-6 sm:px-8 md:px-12 lg:px-20 pt-12 sm:pt-16 lg:pt-20 pb-0">
+      {/* -------------------- Hero Section -------------------- */}
+      <div className="flex items-center bg-gradient-to-r from-[#CBB2FE] via-[#E5C8FF] via-[#F7DFFF] to-[#FFF0E6]">
+        <div className="container mx-auto flex flex-col lg:flex-row px-6 sm:px-8 md:px-12 lg:px-20 pt-12 sm:pt-16 lg:pt-20 pb-0">
 
-    {/* Left Column - Text */}
-    <div className="flex flex-col justify-center w-full lg:w-7/12 text-[#14181b] items-center lg:items-start text-center lg:text-left pt-20 md:pt-20 md:pb-20">
-      <h2 className="text-4xl sm:text-5xl lg:text-[54px] font-bold mb-4 sm:mb-6 leading-tight">
-        Auto-Post to Social Media from One Dashboard
-      </h2>
-      <p className="mb-6 sm:mb-8 text-base sm:text-lg lg:text-xl max-w-xl">
-        Manage unlimited clients. Post to Instagram, TikTok, Facebook, LinkedIn & YouTube. All from one place.
-      </p>
-      <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 w-full sm:w-auto mb-8 sm:mb-12 lg:mb-0">
-        <Link 
-          href="/auth/sign-up" 
-          className="px-6 sm:px-8 py-3 sm:py-4 bg-purple-700 text-white rounded-full font-semibold hover:scale-105 transition-transform text-center text-sm sm:text-base"
-        >
-          Start Free Forever
-        </Link>
-        <button className="px-6 sm:px-8 py-3 sm:py-4 bg-white text-black border-2 border-white rounded-full font-semibold hover:bg-purple-700 hover:text-white transition text-sm sm:text-base">
-          See How It Works
-        </button>
-      </div>
-    </div>
+          {/* Left Column - Text */}
+          <div className="flex flex-col justify-center w-full lg:w-7/12 text-[#14181b] items-center lg:items-start text-center lg:text-left pt-20 md:pt-20 md:pb-20">
+            <h2 className="text-4xl sm:text-5xl lg:text-[54px] font-bold mb-4 sm:mb-6 leading-tight">
+              Auto-Post to Social Media from One Dashboard
+            </h2>
+            <p className="mb-6 sm:mb-8 text-base sm:text-lg lg:text-xl max-w-xl">
+              Manage unlimited clients. Post to Instagram, TikTok, Facebook, LinkedIn & YouTube. All from one place.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 w-full sm:w-auto mb-8 sm:mb-12 lg:mb-0">
+              <Link 
+                href="/auth/sign-up" 
+                className="px-6 sm:px-8 py-3 sm:py-4 bg-purple-700 text-white rounded-full font-semibold hover:scale-105 transition-transform text-center text-sm sm:text-base"
+              >
+                Start Free Forever
+              </Link>
+              <button className="px-6 sm:px-8 py-3 sm:py-4 bg-white text-black border-2 border-white rounded-full font-semibold hover:bg-purple-700 hover:text-white transition text-sm sm:text-base">
+                See How It Works
+              </button>
+            </div>
+          </div>
 
-    {/* Right Column - Image */}
-    <div className="w-full lg:w-5/12 justify-center lg:justify-end items-end hidden md:flex">
-      <div className="relative w-[80%] sm:w-full max-w-[400px] sm:max-w-[500px] lg:max-w-[500px] aspect-square lg:aspect-auto lg:h-full max-h-[400px] sm:max-h-[500px] lg:max-h-[600px]">
-        <Image
-          src="/hero6.png"
-          alt="Hero Image"
-          fill
-          className="object-contain object-bottom"
-          priority
-        />
+          {/* Right Column - Image */}
+          <div className="w-full lg:w-5/12 justify-center lg:justify-end items-end hidden md:flex">
+            <div className="relative w-[80%] sm:w-full max-w-[400px] sm:max-w-[500px] lg:max-w-[500px] aspect-square lg:aspect-auto lg:h-full max-h-[400px] sm:max-h-[500px] lg:max-h-[600px]">
+              <Image
+                src={heroImage} // 2. USE THE IMPORTED IMAGE VARIABLE
+                alt="Hero Image showing social media dashboard"
+                fill
+                className="object-contain object-bottom"
+                priority
+                placeholder="blur" // Optional: adds a nice blur effect while loading
+              />
+            </div>
+          </div>
+        </div>
       </div>
-    </div>
-  </div>
-</div>
 
       {/* ---------------- Features Section ---------------- */}
       <section id="features" className="py-16 md:py-24 px-6 bg-gray-50">
