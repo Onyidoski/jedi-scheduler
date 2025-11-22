@@ -39,7 +39,6 @@ export async function refreshTikTokToken(userId: string, currentRefreshToken: st
   return access_token;
 }
 
-// New helper to get creator info (Mandatory step)
 async function getCreatorInfo(accessToken: string) {
   const response = await fetch(`${TIKTOK_OPEN_API}/post/publish/creator_info/query/`, {
     method: 'POST',
@@ -47,10 +46,14 @@ async function getCreatorInfo(accessToken: string) {
       'Authorization': `Bearer ${accessToken}`,
       'Content-Type': 'application/json; charset=UTF-8',
     },
-    body: JSON.stringify({}) // Empty body required
+    body: JSON.stringify({}) 
   });
 
   const data = await response.json();
+  
+  // DEBUG LOGGING
+  console.log("Creator Info Response:", JSON.stringify(data, null, 2));
+
   if (data.error && data.error.code !== 'ok') {
     throw new Error(`Failed to query creator info: ${data.error.message}`);
   }
@@ -58,15 +61,31 @@ async function getCreatorInfo(accessToken: string) {
 }
 
 export async function publishVideoToTikTok(accessToken: string, videoUrl: string, title: string) {
-  // 1. MANDATORY: Query Creator Info first
-  // TikTok requires this call to validate permissions and privacy settings before allowing a post init.
+  // 1. Query Creator Info to get valid privacy options
   const creatorInfo = await getCreatorInfo(accessToken);
   
-  // Check if user can post (e.g. not banned)
-  // We also get the valid privacy levels here. 
-  // For unaudited apps, it usually forces 'SELF_ONLY' or 'MUTUAL_FOLLOW_FRIENDS'.
-  // We will default to 'SELF_ONLY' to be safe, as 'PUBLIC_TO_EVERYONE' often fails for new apps.
-  const privacyLevel = 'SELF_ONLY'; 
+  // Check what privacy levels are actually allowed for this user
+  const allowedPrivacyLevels = creatorInfo.privacy_level_options || [];
+  console.log("Allowed Privacy Levels:", allowedPrivacyLevels);
+
+  // Select the best available privacy level
+  // For unverified apps, TikTok often RESTRICTS to specific levels.
+  // We try to pick 'SELF_ONLY' first if available, otherwise the first available option.
+  let selectedPrivacy = 'SELF_ONLY';
+  
+  if (allowedPrivacyLevels.length > 0) {
+    if (allowedPrivacyLevels.includes('SELF_ONLY')) {
+      selectedPrivacy = 'SELF_ONLY';
+    } else if (allowedPrivacyLevels.includes('FOLLOWER_OF_CREATOR')) {
+        selectedPrivacy = 'FOLLOWER_OF_CREATOR';
+    } else if (allowedPrivacyLevels.includes('MUTUAL_FOLLOW_FRIENDS')) {
+        selectedPrivacy = 'MUTUAL_FOLLOW_FRIENDS';
+    } else {
+      selectedPrivacy = allowedPrivacyLevels[0];
+    }
+  }
+  
+  console.log(`Using Privacy Level: ${selectedPrivacy}`);
 
   // 2. Fetch the file from Supabase
   const fileResponse = await fetch(videoUrl);
@@ -85,7 +104,7 @@ export async function publishVideoToTikTok(accessToken: string, videoUrl: string
     body: JSON.stringify({
       post_info: {
         title: title.substring(0, 2200),
-        privacy_level: privacyLevel,
+        privacy_level: selectedPrivacy, // Use the dynamic privacy level
         disable_duet: false,
         disable_comment: false,
         disable_stitch: false,
