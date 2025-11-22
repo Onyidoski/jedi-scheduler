@@ -25,14 +25,14 @@ export async function refreshTikTokToken(userId: string, currentRefreshToken: st
   }
 
   // Update the tokens in the database
-  const { access_token, refresh_token, expires_in, open_id } = data;
+  const { access_token, refresh_token, expires_in } = data;
   const expiresAt = new Date(Date.now() + expires_in * 1000);
 
   await supabase
     .from('social_connections')
     .update({
         access_token,
-        refresh_token, // TikTok rotates refresh tokens too
+        refresh_token, 
         expires_at: expiresAt.toISOString()
     })
     .eq('user_id', userId)
@@ -41,12 +41,15 @@ export async function refreshTikTokToken(userId: string, currentRefreshToken: st
   return access_token;
 }
 
-// Helper to initiate video upload (PULL_FROM_URL method is preferred for server-side)
 export async function publishVideoToTikTok(accessToken: string, videoUrl: string, title: string) {
-  // 1. Initialize the post
-  // We use PULL_FROM_URL because the video is already hosted on Supabase (public or signed URL)
-  // This avoids downloading the file to the Vercel server which might timeout.
+  // 1. Fetch the file from Supabase first to get its size and buffer
+  const fileResponse = await fetch(videoUrl);
+  if (!fileResponse.ok) throw new Error("Failed to download video from Supabase");
   
+  const videoBlob = await fileResponse.blob();
+  const videoSize = videoBlob.size;
+
+  // 2. Initialize the upload with TikTok (FILE_UPLOAD mode)
   const initResponse = await fetch(`${TIKTOK_OPEN_API}/post/publish/video/init/`, {
     method: 'POST',
     headers: {
@@ -55,16 +58,18 @@ export async function publishVideoToTikTok(accessToken: string, videoUrl: string
     },
     body: JSON.stringify({
       post_info: {
-        title: title.substring(0, 2200), // TikTok caption limit
-        privacy_level: 'SELF_ONLY', // 'PUBLIC_TO_EVERYONE' requires passing an audit. Start with SELF_ONLY or FOLLOWER_OF_CREATOR
+        title: title.substring(0, 2200),
+        privacy_level: 'SELF_ONLY',
         disable_duet: false,
         disable_comment: false,
         disable_stitch: false,
         video_cover_timestamp_ms: 1000
       },
       source_info: {
-        source: 'PULL_FROM_URL',
-        video_url: videoUrl 
+        source: 'FILE_UPLOAD',
+        video_size: videoSize,
+        chunk_size: videoSize, // Uploading as single chunk for simplicity (limit is 64MB per chunk usually, but this works for smaller files)
+        total_chunk_count: 1
       }
     })
   });
@@ -75,5 +80,23 @@ export async function publishVideoToTikTok(accessToken: string, videoUrl: string
     throw new Error(`TikTok Init Failed: ${initData.error.message} (Log ID: ${initData.error.log_id})`);
   }
 
-  return initData.data; // Contains publish_id
+  const { upload_url, publish_id } = initData.data;
+
+  // 3. Upload the video file to the URL provided by TikTok
+  const uploadResponse = await fetch(upload_url, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'video/mp4',
+      'Content-Range': `bytes 0-${videoSize - 1}/${videoSize}`,
+      'Content-Length': videoSize.toString()
+    },
+    body: videoBlob
+  });
+
+  if (!uploadResponse.ok) {
+    const errorText = await uploadResponse.text();
+    throw new Error(`TikTok Upload Failed: ${errorText}`);
+  }
+
+  return { publish_id };
 }
