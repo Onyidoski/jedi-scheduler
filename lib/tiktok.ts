@@ -1,3 +1,44 @@
+import { createClient } from "./supabase/server";
+
+const TIKTOK_OPEN_API = 'https://open.tiktokapis.com/v2';
+
+export async function refreshTikTokToken(userId: string, currentRefreshToken: string) {
+  const supabase = await createClient();
+  
+  const params = new URLSearchParams();
+  params.append('client_key', process.env.TIKTOK_CLIENT_KEY!);
+  params.append('client_secret', process.env.TIKTOK_CLIENT_SECRET!);
+  params.append('grant_type', 'refresh_token');
+  params.append('refresh_token', currentRefreshToken);
+
+  const response = await fetch(`${TIKTOK_OPEN_API}/oauth/token/`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: params,
+  });
+
+  const data = await response.json();
+
+  if (data.error) {
+    throw new Error(`Failed to refresh TikTok token: ${data.error_description}`);
+  }
+
+  const { access_token, refresh_token, expires_in } = data;
+  const expiresAt = new Date(Date.now() + expires_in * 1000);
+
+  await supabase
+    .from('social_connections')
+    .update({
+        access_token,
+        refresh_token, 
+        expires_at: expiresAt.toISOString()
+    })
+    .eq('user_id', userId)
+    .eq('platform', 'tiktok');
+
+  return access_token;
+}
+
 export async function publishVideoToTikTok(accessToken: string, videoUrl: string, title: string) {
   // --- FIX: FORCE 'SELF_ONLY' FOR UNAUDITED APPS ---
   // We hardcode this because unaudited apps cannot post publicly.
@@ -13,7 +54,7 @@ export async function publishVideoToTikTok(accessToken: string, videoUrl: string
   const videoSize = videoBlob.size;
 
   // 2. Initialize the upload
-  const initResponse = await fetch('https://open.tiktokapis.com/v2/post/publish/video/init/', {
+  const initResponse = await fetch(`${TIKTOK_OPEN_API}/post/publish/video/init/`, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${accessToken}`,
