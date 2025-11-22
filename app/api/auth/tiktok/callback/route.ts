@@ -65,7 +65,8 @@ export async function GET(request: Request) {
     if (!user) throw new Error("User not authenticated");
 
     // 4. Save to Database
-    const { access_token, refresh_token, open_id, expires_in } = tokenData.data;
+    // FIX: TikTok v2 token endpoint returns fields at the root, not inside .data
+    const { access_token, refresh_token, open_id, expires_in } = tokenData;
     
     // Calculate expiry date
     const expiresAt = new Date(Date.now() + expires_in * 1000);
@@ -73,6 +74,7 @@ export async function GET(request: Request) {
     // Optional: Fetch username to display in settings
     let tiktokUsername = 'Connected User';
     try {
+        // Note: The User Info API *does* wrap its response in .data, so this part stays the same
         const userResponse = await fetch('https://open.tiktokapis.com/v2/user/info/?fields=display_name,avatar_url', {
           headers: { 'Authorization': `Bearer ${access_token}` }
         });
