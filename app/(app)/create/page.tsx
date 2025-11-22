@@ -5,18 +5,17 @@ import { Calendar, Loader2, Send } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { AiCaptionHelper } from "@/components/AiCaptionHelper";
-// 1. Import the new VideoUploader
 import { VideoUploader } from "@/components/VideoUploader";
 
 export default function CreatePostPage() {
   const [caption, setCaption] = useState("");
-  // 2. Change 'file' state to store the *result* of the upload
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
-  
   const [platforms, setPlatforms] = useState<string[]>([]);
   const [scheduledAt, setScheduledAt] = useState("");
-  const [loading, setLoading] = useState(false); // This is for DB save
-  const [isUploading, setIsUploading] = useState(false); // This is for file upload
+  
+  const [loading, setLoading] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [publishingStatus, setPublishingStatus] = useState<string>(""); // New state for status updates
 
   const router = useRouter();
   const supabase = createClient();
@@ -26,37 +25,59 @@ export default function CreatePostPage() {
     else setPlatforms([...platforms, platform]);
   };
 
-  // 3. This function is passed to the uploader component
   const handleUploadSuccess = (filePath: string, originalName: string) => {
-    setVideoUrl(filePath); // Store the Supabase path
+    setVideoUrl(filePath);
   };
 
-  // 4. Simplified submitPost function
   const submitPost = async (status: 'published' | 'scheduled', dateToSave: string | null) => {
-    // We now check for videoUrl, not file
     if (!videoUrl) {
-      alert("Please upload a video first."); // We can replace this with a modal later
+      alert("Please upload a video first.");
       return;
     }
     
     setLoading(true);
+    setPublishingStatus("Saving post...");
 
     try {
       const { data: { user }, error: userError } = await supabase.auth.getUser();
       if (userError || !user) throw new Error("You must be logged in.");
 
-      // 5. No more upload logic here! We just save to the database.
-      const { error: dbError } = await supabase.from('Posts').insert({
+      // 1. Save to Database first
+      const { data: insertedPost, error: dbError } = await supabase
+        .from('Posts')
+        .insert({
           user_id: user.id,
           caption: caption,
-          video_url: videoUrl, // Use the path from our state
+          video_url: videoUrl,
           platforms: platforms,
-          status: status,
+          status: status === 'published' ? 'processing' : 'scheduled', // Mark as processing initially
           scheduled_at: dateToSave
-        });
+        })
+        .select()
+        .single();
 
       if (dbError) throw dbError;
 
+      // 2. If "Post Now" and TikTok is selected, trigger the publish API
+      if (status === 'published' && platforms.includes('TikTok')) {
+        setPublishingStatus("Publishing to TikTok...");
+        
+        const response = await fetch('/api/publish/tiktok', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ postId: insertedPost.id })
+        });
+
+        const result = await response.json();
+
+        if (!response.ok) {
+          throw new Error(result.error || "Failed to publish to TikTok");
+        }
+        
+        setPublishingStatus("Published successfully!");
+      }
+
+      // 3. Redirect
       if (status === 'scheduled') router.push("/calendar");
       else router.push("/dashboard");
 
@@ -64,36 +85,32 @@ export default function CreatePostPage() {
       console.error("Error:", error);
       alert("Error: " + error.message);
       setLoading(false);
+      setPublishingStatus("");
     }
   };
 
-  // We disable the form if *either* the uploader is busy or the form is submitting
   const isBusy = loading || isUploading;
 
   return (
     <div className="max-w-3xl mx-auto relative">
       <h1 className="text-3xl font-bold mb-8 text-white">Create New Post</h1>
 
-      {/* We no longer need the <form> tag to wrap everything */}
       <div className="space-y-8 bg-[#1A1D21] p-8 rounded-2xl border border-white/5 shadow-2xl relative">
 
-          {/* Loading Overlay for *saving* (upload has its own) */}
           {loading && (
-            <div className="absolute inset-0 bg-[#1A1D21]/80 backdrop-blur-sm z-50 rounded-2xl flex flex-col items-center justify-center">
+            <div className="absolute inset-0 bg-[#1A1D21]/90 backdrop-blur-sm z-50 rounded-2xl flex flex-col items-center justify-center">
               <Loader2 className="w-12 h-12 text-[#8B5CF6] animate-spin mb-4" />
-              <p className="text-white font-medium text-lg">Saving Post...</p>
-              <p className="text-slate-400 text-sm mt-2">Please do not close this page.</p>
+              <p className="text-white font-medium text-lg">{publishingStatus || "Processing..."}</p>
+              <p className="text-slate-400 text-sm mt-2">Do not close this window.</p>
             </div>
           )}
   
-          {/* 6. Replace the old Video Upload div with our new component */}
           <VideoUploader 
             onUploadSuccess={handleUploadSuccess}
             onUploadStart={() => setIsUploading(true)}
             onUploadEnd={() => setIsUploading(false)}
           />
 
-        {/* 2. Caption Input */}
         <div>
           <label className="block text-sm font-medium mb-3 text-slate-300">Caption</label>
           <textarea
@@ -102,17 +119,14 @@ export default function CreatePostPage() {
             onChange={(e) => setCaption(e.target.value)}
             disabled={isBusy}
             className="w-full p-4 rounded-xl border border-white/10 bg-[#141619] text-white placeholder:text-slate-600 focus:border-[#8B5CF6] focus:ring-1 focus:ring-[#8B5CF6] outline-none transition-all resize-none disabled:opacity-50"
-            placeholder="Write something engaging... or use the AI helper below!"
+            placeholder="Write something engaging..."
           />
         </div>
 
-        {/* 3. AI CAPTION HELPER - INTEGRATED! */}
         <div className="border-t border-white/5 pt-8">
           <AiCaptionHelper setMainCaption={setCaption} />
         </div>
 
-
-        {/* 4. Platforms */}
           <div>
             <label className="block text-sm font-medium mb-3 text-slate-300">Select Platforms</label>
             <div className="flex flex-wrap gap-3">
@@ -134,7 +148,6 @@ export default function CreatePostPage() {
             </div>
           </div>
   
-          {/* 5. Scheduling */}
           <div className="pt-6 border-t border-white/5">
             <label className="block text-sm font-medium mb-3 text-slate-300 flex items-center gap-2">
                <Calendar className="w-4 h-4 text-slate-500" />
@@ -149,7 +162,6 @@ export default function CreatePostPage() {
             />
           </div>
   
-          {/* Submit Buttons */}
           <div className="flex gap-4 pt-6">
              <button
               type="button"
