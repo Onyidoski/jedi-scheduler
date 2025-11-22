@@ -1,10 +1,9 @@
 "use client";
 
 import { createClient } from "@/lib/supabase/client";
-import { Loader2, Mail, Lock, Wand2 } from "lucide-react";
+import { Loader2, Mail, Lock } from "lucide-react";
 import { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-// We REMOVED 'Link' from next/link because we want a standard HTML tag
 
 export const dynamic = 'force-dynamic';
 
@@ -17,11 +16,6 @@ function SettingsContent() {
   const [loading, setLoading] = useState(true);
   const [resetting, setResetting] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
-
-  const [isTikTokConnected, setIsTikTokConnected] = useState(false);
-  const [tikTokUsername, setTikTokUsername] = useState<string | null>(null);
-  
-  const [isDisconnecting, setIsDisconnecting] = useState(false);
 
   useEffect(() => {
     const error = searchParams.get('error');
@@ -36,44 +30,10 @@ function SettingsContent() {
         return;
       }
       setUser(user);
-
-      // Check if user has a TikTok connection
-      // NOTE: If this fails with a 400 error, check that 'platform_username'
-      // exists in your 'social_connections' table in Supabase!
-      const { data: connection } = await supabase
-        .from('social_connections')
-        .select('platform_username')
-        .eq('user_id', user.id)
-        .eq('platform', 'tiktok')
-        .single();
-      
-      if (connection) {
-        setIsTikTokConnected(true);
-        setTikTokUsername(connection.platform_username);
-      }
-
       setLoading(false);
     };
     getUser();
   }, [supabase, router, searchParams]);
-  
-  const handleDisconnectTikTok = async () => {
-    setIsDisconnecting(true);
-    const { error } = await supabase
-      .from('social_connections')
-      .delete()
-      .eq('platform', 'tiktok'); 
-
-    if (error) {
-      setMessage({ type: 'error', text: error.message });
-    } else {
-      setIsTikTokConnected(false);
-      setTikTokUsername(null);
-      setMessage({ type: 'success', text: 'TikTok account disconnected.' });
-      router.refresh();
-    }
-    setIsDisconnecting(false);
-  };
 
   const handlePasswordReset = async () => {
     if (!user?.email) return;
@@ -107,42 +67,6 @@ function SettingsContent() {
 
       <div className="bg-[#1A1D21] p-8 rounded-2xl border border-white/5 shadow-2xl space-y-8">
         
-        {/* --- Connect Accounts Section --- */}
-        <div className="space-y-4">
-          <h3 className="text-lg font-medium text-white mb-4 flex items-center gap-2">
-            <Wand2 className="w-5 h-5" />
-            Connect Accounts
-          </h3>
-          <p className="text-slate-400 text-sm">
-            Connect your social media accounts to allow Jedi Scheduler to post on your behalf.
-          </p>
-
-          <div className="flex items-center justify-between p-4 bg-[#141619] rounded-lg border border-white/10">
-            <span className="text-lg font-medium text-white">
-              {isTikTokConnected ? `TikTok (@${tikTokUsername || 'Connected'})` : "TikTok"}
-            </span>
-            
-            {isTikTokConnected ? (
-              <button
-                onClick={handleDisconnectTikTok}
-                disabled={isDisconnecting}
-                className="flex items-center justify-center gap-2 w-32 px-4 py-2 font-bold bg-red-600 text-white rounded-lg hover:bg-red-700 transition-all disabled:opacity-50"
-              >
-                {isDisconnecting ? <Loader2 className="w-5 h-5 animate-spin" /> : "Disconnect"}
-              </button>
-            ) : (
-              // --- THIS IS THE FIX: Use a standard HTML <a> tag ---
-              // This forces a full browser navigation, avoiding the CORS error
-              <a
-                href="/api/auth/tiktok/start"
-                className="flex items-center justify-center gap-2 w-32 px-4 py-2 font-bold bg-[#8B5CF6] text-white rounded-lg hover:bg-[#7C3AED] transition-all text-center"
-              >
-                Connect
-              </a>
-            )}
-          </div>
-        </div>
-
         {/* Email Section */}
         <div>
           <label className="block text-sm font-medium mb-3 text-slate-300">Email Address</label>
@@ -185,7 +109,6 @@ function SettingsContent() {
   );
 }
 
-// Wrap the component in Suspense to handle useSearchParams
 export default function SettingsPage() {
   return (
     <Suspense fallback={

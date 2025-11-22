@@ -10,12 +10,13 @@ export async function GET(request: Request) {
   const state = url.searchParams.get('state');
   const error = url.searchParams.get('error');
 
+  // Redirect to the connect page on error
   if (error) {
-    return NextResponse.redirect(new URL(`/settings?error=${error}`, request.url));
+    return NextResponse.redirect(new URL(`/connect/tiktok?error=${error}`, request.url));
   }
 
   if (!code) {
-    return NextResponse.redirect(new URL('/settings?error=No+code+provided', request.url));
+    return NextResponse.redirect(new URL('/connect/tiktok?error=No+code+provided', request.url));
   }
 
   // 1. Verify State (CSRF Protection)
@@ -28,7 +29,7 @@ export async function GET(request: Request) {
 
   if (!state || !storedState || state !== storedState) {
     // Create response to delete the cookie and redirect with error
-    const response = NextResponse.redirect(new URL('/settings?error=Invalid+state', request.url));
+    const response = NextResponse.redirect(new URL('/connect/tiktok?error=Invalid+state', request.url));
     response.cookies.set('tiktok_oauth_state', '', { maxAge: 0 });
     return response;
   }
@@ -65,7 +66,7 @@ export async function GET(request: Request) {
     if (!user) throw new Error("User not authenticated");
 
     // 4. Save to Database
-    // FIX: TikTok v2 token endpoint returns fields at the root, not inside .data
+    // FIX: TikTok v2 token endpoint returns fields at the root, NOT inside a .data property
     const { access_token, refresh_token, open_id, expires_in } = tokenData;
     
     // Calculate expiry date
@@ -103,8 +104,8 @@ export async function GET(request: Request) {
 
     if (dbError) throw dbError;
 
-    // 5. Success! Redirect back to settings
-    const response = NextResponse.redirect(new URL('/settings', request.url));
+    // 5. Success! Redirect back to the connection page
+    const response = NextResponse.redirect(new URL('/connect/tiktok', request.url));
     
     // Clean up the state cookie
     response.cookies.set('tiktok_oauth_state', '', { maxAge: 0 });
@@ -113,7 +114,7 @@ export async function GET(request: Request) {
 
   } catch (err: any) {
     console.error("TikTok Auth Error:", err);
-    const response = NextResponse.redirect(new URL(`/settings?error=${encodeURIComponent(err.message)}`, request.url));
+    const response = NextResponse.redirect(new URL(`/connect/tiktok?error=${encodeURIComponent(err.message)}`, request.url));
     // Clean up cookie on error too
     response.cookies.set('tiktok_oauth_state', '', { maxAge: 0 });
     return response;
