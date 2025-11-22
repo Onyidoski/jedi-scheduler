@@ -4,9 +4,8 @@ import { createClient } from "@/lib/supabase/client";
 import { Loader2, Mail, Lock, Wand2 } from "lucide-react";
 import { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import Link from "next/link";
+// We REMOVED 'Link' from next/link because we want a standard HTML tag
 
-// This tells Vercel not to prerender this page, which solves the build error
 export const dynamic = 'force-dynamic';
 
 function SettingsContent() {
@@ -22,11 +21,9 @@ function SettingsContent() {
   const [isTikTokConnected, setIsTikTokConnected] = useState(false);
   const [tikTokUsername, setTikTokUsername] = useState<string | null>(null);
   
-  // We don't need isConnecting state for the link, but we can keep it for disconnect
   const [isDisconnecting, setIsDisconnecting] = useState(false);
 
   useEffect(() => {
-    // Check for errors in the URL (returned from our callback route)
     const error = searchParams.get('error');
     if (error) {
       setMessage({ type: 'error', text: decodeURIComponent(error) });
@@ -40,7 +37,9 @@ function SettingsContent() {
       }
       setUser(user);
 
-      // Check if user has a TikTok connection in OUR database
+      // Check if user has a TikTok connection
+      // NOTE: If this fails with a 400 error, check that 'platform_username'
+      // exists in your 'social_connections' table in Supabase!
       const { data: connection } = await supabase
         .from('social_connections')
         .select('platform_username')
@@ -58,14 +57,12 @@ function SettingsContent() {
     getUser();
   }, [supabase, router, searchParams]);
   
-  // Disconnect function: deletes the row from Supabase
   const handleDisconnectTikTok = async () => {
     setIsDisconnecting(true);
     const { error } = await supabase
       .from('social_connections')
       .delete()
       .eq('platform', 'tiktok'); 
-      // RLS policy handles the user_id check automatically
 
     if (error) {
       setMessage({ type: 'error', text: error.message });
@@ -77,7 +74,6 @@ function SettingsContent() {
     }
     setIsDisconnecting(false);
   };
-
 
   const handlePasswordReset = async () => {
     if (!user?.email) return;
@@ -135,13 +131,14 @@ function SettingsContent() {
                 {isDisconnecting ? <Loader2 className="w-5 h-5 animate-spin" /> : "Disconnect"}
               </button>
             ) : (
-              // This is the Link that calls our API route to start the OAuth flow
-              <Link
+              // --- THIS IS THE FIX: Use a standard HTML <a> tag ---
+              // This forces a full browser navigation, avoiding the CORS error
+              <a
                 href="/api/auth/tiktok/start"
                 className="flex items-center justify-center gap-2 w-32 px-4 py-2 font-bold bg-[#8B5CF6] text-white rounded-lg hover:bg-[#7C3AED] transition-all text-center"
               >
                 Connect
-              </Link>
+              </a>
             )}
           </div>
         </div>
