@@ -15,7 +15,7 @@ export default function CreatePostPage() {
   
   const [loading, setLoading] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
-  const [publishingStatus, setPublishingStatus] = useState<string>(""); // New state for status updates
+  const [publishingStatus, setPublishingStatus] = useState<string>(""); 
 
   const router = useRouter();
   const supabase = createClient();
@@ -50,7 +50,7 @@ export default function CreatePostPage() {
           caption: caption,
           video_url: videoUrl,
           platforms: platforms,
-          status: status === 'published' ? 'processing' : 'scheduled', // Mark as processing initially
+          status: status === 'published' ? 'processing' : 'scheduled',
           scheduled_at: dateToSave
         })
         .select()
@@ -78,6 +78,8 @@ export default function CreatePostPage() {
       }
 
       // 3. Redirect
+      // --- FIX: REFRESH ROUTER BEFORE PUSHING ---
+      router.refresh(); 
       if (status === 'scheduled') router.push("/calendar");
       else router.push("/dashboard");
 
