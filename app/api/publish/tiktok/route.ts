@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { publishVideoToTikTok, refreshTikTokToken } from "@/lib/tiktok";
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache"; // Import revalidatePath
 
 // Increase timeout for this route since it involves external API calls
 export const maxDuration = 60; 
@@ -36,19 +37,16 @@ export async function POST(req: Request) {
     // 4. Check Token Expiry & Refresh if needed
     let accessToken = connection.access_token;
     const expiresAt = new Date(connection.expires_at);
-    // Refresh if expired or expires in less than 5 minutes
     if (expiresAt < new Date(Date.now() + 5 * 60 * 1000)) {
       console.log("Refreshing TikTok token...");
       accessToken = await refreshTikTokToken(user.id, connection.refresh_token);
     }
 
-    // 5. Generate a Signed URL for the video
-    // TikTok needs a publicly accessible URL to download the video.
-    // A signed URL from Supabase works perfectly for this.
+    // 5. Generate a Signed URL
     const { data: signedUrlData, error: signedError } = await supabase
       .storage
       .from('Videos')
-      .createSignedUrl(post.video_url, 3600); // Valid for 1 hour
+      .createSignedUrl(post.video_url, 3600);
 
     if (signedError || !signedUrlData?.signedUrl) {
       throw new Error("Failed to generate video URL");
@@ -62,14 +60,21 @@ export async function POST(req: Request) {
     );
 
     // 7. Update Post Status in DB
-    // Note: 'publish_id' allows checking status later, but for now we assume success if no error thrown
-    await supabase
+    const { error: updateError } = await supabase
       .from('Posts')
       .update({ 
         status: 'published',
         platform_post_id: result.publish_id 
       })
       .eq('id', postId);
+
+    if (updateError) {
+      console.error("Failed to update DB status:", updateError);
+    }
+
+    // --- FIX: Force Dashboard & Calendar to refresh data ---
+    revalidatePath('/dashboard');
+    revalidatePath('/calendar');
 
     return NextResponse.json({ success: true, data: result });
 
